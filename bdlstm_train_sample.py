@@ -4,19 +4,19 @@ connectionist temporal classification to predict character sequences from nFeatu
 arrays of Mel-Frequency Cepstral Coefficients.  This is test code to run on the
 8-item data set in the "sample_data" directory, for those without access to TIMIT.
 
-Author: Jon Rein
+Original Author: Jon Rein
+
+Current Author: Andreas Kirkedal
 '''
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 from tensorflow.python.ops import ctc_ops as ctc
 from tensorflow.python.ops import rnn_cell
 from tensorflow.python.ops.rnn import bidirectional_rnn
 import numpy as np
 from utils import load_batched_data
+import sys
+import matplotlib.pyplot as plt
+
 
 INPUT_PATH = './sample_data/mfcc' #directory of MFCC nFeatures x nFrames 2-D array .npy files
 TARGET_PATH = './sample_data/char_y/' #directory of nCharacters 1-D array .npy files
@@ -35,6 +35,12 @@ nClasses = 28#27 characters, plus the "blank" for CTC
 ####Load data
 print('Loading data')
 batchedData, maxTimeSteps, totalN = load_batched_data(INPUT_PATH, TARGET_PATH, batchSize)
+print('totalN', totalN)
+print('maxTimeSteps', maxTimeSteps)
+#sys.exit()
+
+losses = []
+errorRates = []
 
 ####Define graph
 print('Defining graph')
@@ -42,11 +48,11 @@ graph = tf.Graph()
 with graph.as_default():
 
     ####NOTE: try variable-steps inputs and dynamic bidirectional rnn, when it's implemented in tensorflow
-        
+
     ####Graph input
     inputX = tf.placeholder(tf.float32, shape=(maxTimeSteps, batchSize, nFeatures))
     #Prep input data to fit requirements of rnn.bidirectional_rnn
-    #  Reshape to 2-D tensor (nTimeSteps*batchSize, nfeatures)
+    #  Reshape to 2-D tensor (maxTimeSteps*batchSize, nfeatures)
     inputXrs = tf.reshape(inputX, [-1, nFeatures])
     #  Split to get a list of 'n_steps' tensors of shape (batch_size, n_hidden)
     inputList = tf.split(0, maxTimeSteps, inputXrs)
@@ -106,6 +112,18 @@ with tf.Session(graph=graph) as session:
             if (batch % 1) == 0:
                 print('Minibatch', batch, '/', batchOrigI, 'loss:', l)
                 print('Minibatch', batch, '/', batchOrigI, 'error rate:', er)
+                losses.append(l)
+                errorRates.append(er)
             batchErrors[batch] = er*len(batchSeqLengths)
         epochErrorRate = batchErrors.sum() / totalN
         print('Epoch', epoch+1, 'error rate:', epochErrorRate)
+
+plt.plot(losses)
+plt.xlabel('Iterations')
+plt.ylabel('CTC loss')
+plt.savefig('losses.png')
+
+plt.plot(errorRates)
+plt.xlabel('Iterations')
+plt.ylabel('Error rate')
+plt.savefig('errorrates.png')
